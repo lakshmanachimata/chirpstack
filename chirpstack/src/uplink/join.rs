@@ -57,7 +57,7 @@ pub struct JoinRequest {
 
 impl JoinRequest {
     pub async fn handle(ufs: UplinkFrameSet) {
-        let span = span!(Level::INFO, "join_request");
+        let span = span!(Level::INFO, "join_request", dev_eui = tracing::field::Empty);
 
         if let Err(e) = JoinRequest::_handle(ufs).instrument(span).await {
             match e.downcast_ref::<Error>() {
@@ -113,6 +113,14 @@ impl JoinRequest {
         };
 
         ctx.get_join_request_payload()?;
+
+        // Add resolved DevEUI to the span
+        let span = tracing::Span::current();
+        span.record(
+            "dev_eui",
+            ctx.join_request.as_ref().unwrap().dev_eui.to_string(),
+        );
+
         ctx.get_device_or_try_pr_roaming().await?;
         ctx.get_device_keys_or_js_client().await?; // used to validate MIC + if we need external JS
         ctx.get_application().await?;

@@ -51,7 +51,7 @@ pub struct Data {
 
 impl Data {
     pub async fn handle(ufs: UplinkFrameSet) {
-        let span = span!(Level::INFO, "data_up");
+        let span = span!(Level::INFO, "data_up", dev_eui = tracing::field::Empty);
 
         if let Err(e) = Data::_handle(ufs).instrument(span).await {
             match e.downcast_ref::<Error>() {
@@ -110,7 +110,13 @@ impl Data {
 
         ctx.handle_passive_roaming_device().await?;
         ctx.get_device_session().await?;
+
         ctx.get_device().await?;
+
+        // Add dev_eui to span
+        let span = tracing::Span::current();
+        span.record("dev_eui", ctx.device.as_ref().unwrap().dev_eui.to_string());
+
         ctx.get_device_profile().await?;
         ctx.get_application().await?;
         ctx.get_tenant().await?;
