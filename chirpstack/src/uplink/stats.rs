@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local};
-use tracing::{error, info, span, trace, Instrument, Level};
+use tracing::{error, info, span, trace, warn, Instrument, Level};
 
 use crate::gateway::backend as gateway_backend;
 use crate::helpers::errors::PrintFullError;
@@ -29,7 +29,7 @@ impl Stats {
         } {
             Ok(v) => v,
             Err(e) => {
-                error!(error = %e.full(), "Decode stats gateway_id error");
+                warn!(error = %e.full(), "Decode stats gateway_id error");
                 return;
             }
         };
