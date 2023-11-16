@@ -5,7 +5,12 @@ use anyhow::Context;
 use anyhow::Result;
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
+use diesel_async::pooled_connection::deadpool::{Object as DeadpoolObject, Pool as DeadpoolPool};
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::AsyncPgConnection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use tokio::task;
 use tracing::info;
 
 use crate::config;
@@ -34,10 +39,13 @@ pub mod search;
 pub mod tenant;
 pub mod user;
 
+pub type AsyncPgPool = DeadpoolPool<AsyncPgConnection>;
+pub type AsyncPgPoolConnection = DeadpoolObject<AsyncPgConnection>;
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
 lazy_static! {
+    static ref ASYNC_PG_POOL: RwLock<Option<AsyncPgPool>> = RwLock::new(None);
     static ref PG_POOL: RwLock<Option<PgPool>> = RwLock::new(None);
     static ref REDIS_POOL: RwLock<Option<RedisPool>> = RwLock::new(None);
     static ref REDIS_PREFIX: RwLock<String> = RwLock::new("".to_string());
@@ -179,12 +187,15 @@ pub async fn setup() -> Result<()> {
         .build(ConnectionManager::new(&conf.postgresql.dsn))
         .context("Setup PostgreSQL connection pool error")?;
     set_db_pool(pg_pool);
-    let mut pg_conn = get_db_conn()?;
+    // let mut pg_conn = get_db_conn()?;
 
-    info!("Applying schema migrations");
-    pg_conn
-        .run_pending_migrations(MIGRATIONS)
-        .map_err(|e| anyhow!("{}", e))?;
+    // ASYNC POOL
+    let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(&conf.postgresql.dsn);
+    let pool = DeadpoolPool::builder(config)
+        .max_size(conf.postgresql.max_open_connections as usize)
+        .build()?;
+    set_async_db_pool(pool);
+    run_db_migrations().await?;
 
     info!("Setting up Redis client");
     if conf.redis.cluster {
@@ -221,6 +232,15 @@ pub async fn setup() -> Result<()> {
     Ok(())
 }
 
+pub fn get_async_db_pool() -> Result<AsyncPgPool> {
+    let pool_r = ASYNC_PG_POOL.read().unwrap();
+    let pool: AsyncPgPool = pool_r
+        .as_ref()
+        .ok_or_else(|| anyhow!("PostgreSQL connection pool is not initialized"))?
+        .clone();
+    Ok(pool)
+}
+
 pub fn get_db_pool() -> Result<PgPool> {
     let pool_r = PG_POOL.read().unwrap();
     let pool = pool_r
@@ -228,6 +248,11 @@ pub fn get_db_pool() -> Result<PgPool> {
         .ok_or_else(|| anyhow!("PostgreSQL connection pool is not initialized (yet)"))?
         .clone();
     Ok(pool)
+}
+
+pub async fn get_async_db_conn() -> Result<AsyncPgPoolConnection> {
+    let pool = get_async_db_pool()?;
+    Ok(pool.get().await?)
 }
 
 pub fn get_db_conn() -> Result<PgPoolConnection> {
@@ -246,9 +271,31 @@ pub fn get_redis_conn() -> Result<RedisPoolConnection> {
     })
 }
 
+pub fn set_async_db_pool(p: AsyncPgPool) {
+    let mut pool_w = ASYNC_PG_POOL.write().unwrap();
+    *pool_w = Some(p);
+}
+
 pub fn set_db_pool(p: PgPool) {
     let mut pool_w = PG_POOL.write().unwrap();
     *pool_w = Some(p);
+}
+
+pub async fn run_db_migrations() -> Result<()> {
+    info!("Applying schema migrations");
+
+    let c = get_async_db_conn().await?;
+    let mut c_wrapped: AsyncConnectionWrapper<AsyncPgPoolConnection> =
+        AsyncConnectionWrapper::from(c);
+
+    task::spawn_blocking(move || -> Result<()> {
+        c_wrapped
+            .run_pending_migrations(MIGRATIONS)
+            .map_err(|e| anyhow!("{}", e))?;
+
+        Ok(())
+    })
+    .await?
 }
 
 pub fn set_redis_pool(p: RedisPool) {
