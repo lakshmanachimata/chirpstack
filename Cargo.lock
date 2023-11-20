@@ -1133,8 +1133,7 @@ dependencies = [
 [[package]]
 name = "diesel"
 version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d98235fdc2f355d330a8244184ab6b4b33c28679c0b4158f63138e51d6cf7e88"
+source = "git+https://github.com/diesel-rs/diesel.git?rev=566dcccc6df6adb6ceddef8df5e1806e2a065c40#566dcccc6df6adb6ceddef8df5e1806e2a065c40"
 dependencies = [
  "bigdecimal",
  "bitflags 2.4.0",
@@ -1145,8 +1144,6 @@ dependencies = [
  "num-bigint",
  "num-integer",
  "num-traits",
- "pq-sys",
- "r2d2",
  "serde_json",
  "uuid",
 ]
@@ -1167,11 +1164,11 @@ dependencies = [
 
 [[package]]
 name = "diesel_derives"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e054665eaf6d97d1e7125512bb2d35d07c73ac86cc6920174cb42d1ab697a554"
+version = "2.1.0"
+source = "git+https://github.com/diesel-rs/diesel.git?rev=566dcccc6df6adb6ceddef8df5e1806e2a065c40#566dcccc6df6adb6ceddef8df5e1806e2a065c40"
 dependencies = [
  "diesel_table_macro_syntax",
+ "dsl_auto_type",
  "proc-macro2",
  "quote",
  "syn 2.0.37",
@@ -1191,8 +1188,7 @@ dependencies = [
 [[package]]
 name = "diesel_table_macro_syntax"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc5557efc453706fed5e4fa85006fe9817c224c3f480a34c7e5959fd700921c5"
+source = "git+https://github.com/diesel-rs/diesel.git?rev=566dcccc6df6adb6ceddef8df5e1806e2a065c40#566dcccc6df6adb6ceddef8df5e1806e2a065c40"
 dependencies = [
  "syn 2.0.37",
 ]
@@ -1247,6 +1243,19 @@ name = "dotenv"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+
+[[package]]
+name = "dsl_auto_type"
+version = "0.1.0"
+source = "git+https://github.com/diesel-rs/diesel.git?rev=566dcccc6df6adb6ceddef8df5e1806e2a065c40#566dcccc6df6adb6ceddef8df5e1806e2a065c40"
+dependencies = [
+ "darling",
+ "either",
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.37",
+]
 
 [[package]]
 name = "dtoa"
@@ -2995,15 +3004,6 @@ name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
-
-[[package]]
-name = "pq-sys"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31c0052426df997c0cbd30789eb44ca097e3541717a7b8fa36b1c464ee7edebd"
-dependencies = [
- "vcpkg",
-]
 
 [[package]]
 name = "precomputed-hash"

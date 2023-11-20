@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
+use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
+use diesel_async::pooled_connection::deadpool::{Object as DeadpoolObject, Pool as DeadpoolPool};
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use tokio::task;
 use tracing::info;
 use uuid::Uuid;
 
@@ -25,7 +25,8 @@ mod schema;
 pub const MIGRATIONS: EmbeddedMigrations =
     embed_migrations!("./src/integration/postgresql/migrations");
 
-type PgPool = Pool<ConnectionManager<PgConnection>>;
+pub type AsyncPgPool = DeadpoolPool<AsyncPgConnection>;
+pub type AsyncPgPoolConnection = DeadpoolObject<AsyncPgConnection>;
 
 #[derive(Insertable)]
 #[diesel(table_name = event_up)]
@@ -189,27 +190,30 @@ struct EventIntegration {
 }
 
 pub struct Integration {
-    pg_pool: PgPool,
+    pg_pool: AsyncPgPool,
 }
 
 impl Integration {
-    pub fn new(conf: &Config) -> Result<Integration> {
+    pub async fn new(conf: &Config) -> Result<Integration> {
         info!("Initializing PostgreSQL integration");
 
-        let pg_pool = PgPool::builder()
-            .max_size(conf.max_open_connections)
-            .min_idle(match conf.min_idle_connections {
-                0 => None,
-                _ => Some(conf.min_idle_connections),
-            })
-            .build(ConnectionManager::new(&conf.dsn))
-            .context("Setup PostgreSQL connection pool error")?;
-        let mut db_conn = pg_pool.get()?;
+        let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(&conf.dsn);
+        let pg_pool = DeadpoolPool::builder(config)
+            .max_size(conf.max_open_connections as usize)
+            .build()?;
+
+        let c = pg_pool.get().await?;
+        let mut c_wrapped: AsyncConnectionWrapper<AsyncPgPoolConnection> =
+            AsyncConnectionWrapper::from(c);
 
         info!("Applying schema migrations");
-        db_conn
-            .run_pending_migrations(MIGRATIONS)
-            .map_err(|e| anyhow!("{}", e))?;
+        tokio::task::spawn_blocking(move || -> Result<()> {
+            c_wrapped
+                .run_pending_migrations(MIGRATIONS)
+                .map_err(|e| anyhow!("{}", e))?;
+            Ok(())
+        })
+        .await??;
 
         Ok(Integration { pg_pool })
     }
@@ -254,16 +258,12 @@ impl IntegrationTrait for Integration {
             rx_info: serde_json::to_value(&pl.rx_info)?,
             tx_info: serde_json::to_value(&pl.tx_info)?,
         };
-        let mut c = self.pg_pool.get()?;
+        let mut c = self.pg_pool.get().await?;
 
-        task::spawn_blocking(move || -> Result<()> {
-            diesel::insert_into(event_up::table)
-                .values(&e)
-                .execute(&mut c)?;
-            Ok(())
-        })
-        .await??;
-
+        diesel::insert_into(event_up::table)
+            .values(&e)
+            .execute(&mut c)
+            .await?;
         Ok(())
     }
 
@@ -295,16 +295,12 @@ impl IntegrationTrait for Integration {
             tags: serde_json::to_value(&di.tags)?,
             dev_addr: pl.dev_addr.clone(),
         };
-        let mut c = self.pg_pool.get()?;
+        let mut c = self.pg_pool.get().await?;
 
-        task::spawn_blocking(move || -> Result<()> {
-            diesel::insert_into(event_join::table)
-                .values(&e)
-                .execute(&mut c)?;
-            Ok(())
-        })
-        .await??;
-
+        diesel::insert_into(event_join::table)
+            .values(&e)
+            .execute(&mut c)
+            .await?;
         Ok(())
     }
 
@@ -338,16 +334,12 @@ impl IntegrationTrait for Integration {
             acknowledged: pl.acknowledged,
             f_cnt_down: pl.f_cnt_down as i64,
         };
-        let mut c = self.pg_pool.get()?;
+        let mut c = self.pg_pool.get().await?;
 
-        task::spawn_blocking(move || -> Result<()> {
-            diesel::insert_into(event_ack::table)
-                .values(&e)
-                .execute(&mut c)?;
-            Ok(())
-        })
-        .await??;
-
+        diesel::insert_into(event_ack::table)
+            .values(&e)
+            .execute(&mut c)
+            .await?;
         Ok(())
     }
 
@@ -382,16 +374,12 @@ impl IntegrationTrait for Integration {
             gateway_id: pl.gateway_id.clone(),
             tx_info: serde_json::to_value(&pl.tx_info)?,
         };
-        let mut c = self.pg_pool.get()?;
+        let mut c = self.pg_pool.get().await?;
 
-        task::spawn_blocking(move || -> Result<()> {
-            diesel::insert_into(event_tx_ack::table)
-                .values(&e)
-                .execute(&mut c)?;
-            Ok(())
-        })
-        .await??;
-
+        diesel::insert_into(event_tx_ack::table)
+            .values(&e)
+            .execute(&mut c)
+            .await?;
         Ok(())
     }
 
@@ -425,16 +413,12 @@ impl IntegrationTrait for Integration {
             description: pl.description.clone(),
             context: serde_json::to_value(&pl.context)?,
         };
-        let mut c = self.pg_pool.get()?;
+        let mut c = self.pg_pool.get().await?;
 
-        task::spawn_blocking(move || -> Result<()> {
-            diesel::insert_into(event_log::table)
-                .values(&e)
-                .execute(&mut c)?;
-            Ok(())
-        })
-        .await??;
-
+        diesel::insert_into(event_log::table)
+            .values(&e)
+            .execute(&mut c)
+            .await?;
         Ok(())
     }
 
@@ -469,15 +453,12 @@ impl IntegrationTrait for Integration {
             battery_level_unavailable: pl.battery_level_unavailable,
             battery_level: pl.battery_level,
         };
-        let mut c = self.pg_pool.get()?;
+        let mut c = self.pg_pool.get().await?;
 
-        task::spawn_blocking(move || -> Result<()> {
-            diesel::insert_into(event_status::table)
-                .values(&e)
-                .execute(&mut c)?;
-            Ok(())
-        })
-        .await??;
+        diesel::insert_into(event_status::table)
+            .values(&e)
+            .execute(&mut c)
+            .await?;
         Ok(())
     }
 
@@ -514,16 +495,12 @@ impl IntegrationTrait for Integration {
             source: loc.source.to_string(),
             accuracy: loc.accuracy,
         };
-        let mut c = self.pg_pool.get()?;
+        let mut c = self.pg_pool.get().await?;
 
-        task::spawn_blocking(move || -> Result<()> {
-            diesel::insert_into(event_location::table)
-                .values(&e)
-                .execute(&mut c)?;
-            Ok(())
-        })
-        .await??;
-
+        diesel::insert_into(event_location::table)
+            .values(&e)
+            .execute(&mut c)
+            .await?;
         Ok(())
     }
 
@@ -557,16 +534,12 @@ impl IntegrationTrait for Integration {
             event_type: pl.event_type.clone(),
             object: serde_json::to_value(&pl.object)?,
         };
-        let mut c = self.pg_pool.get()?;
+        let mut c = self.pg_pool.get().await?;
 
-        task::spawn_blocking(move || -> Result<()> {
-            diesel::insert_into(event_integration::table)
-                .values(&e)
-                .execute(&mut c)?;
-            Ok(())
-        })
-        .await??;
-
+        diesel::insert_into(event_integration::table)
+            .values(&e)
+            .execute(&mut c)
+            .await?;
         Ok(())
     }
 }

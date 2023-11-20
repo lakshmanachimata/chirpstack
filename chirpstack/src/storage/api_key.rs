@@ -123,7 +123,7 @@ pub mod test {
     }
 
     pub async fn get(id: &Uuid) -> Result<ApiKey, Error> {
-        let mut c = get_async_db_conn()?;
+        let mut c = get_async_db_conn().await?;
         api_key::dsl::api_key
             .find(&id)
             .first(&mut c)
