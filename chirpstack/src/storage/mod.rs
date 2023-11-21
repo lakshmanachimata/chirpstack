@@ -1,16 +1,21 @@
+use std::fs::File;
+use std::io::BufReader;
 use std::ops::{Deref, DerefMut};
 use std::sync::RwLock;
 
 use anyhow::Context;
 use anyhow::Result;
+use diesel::{ConnectionError, ConnectionResult};
 use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
 use diesel_async::pooled_connection::deadpool::{Object as DeadpoolObject, Pool as DeadpoolPool};
-use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::pooled_connection::{AsyncDieselConnectionManager, ManagerConfig};
 use diesel_async::AsyncPgConnection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use futures_util::future::BoxFuture;
+use futures_util::FutureExt;
 use r2d2::{Pool, PooledConnection};
 use tokio::task;
-use tracing::info;
+use tracing::{error, info};
 
 use crate::config;
 
@@ -174,8 +179,14 @@ pub async fn setup() -> Result<()> {
     let conf = config::get();
 
     info!("Setting up PostgreSQL connection pool");
-    let config = AsyncDieselConnectionManager::<AsyncPgConnection>::new(&conf.postgresql.dsn);
-    let pool = DeadpoolPool::builder(config)
+    let mut config = ManagerConfig::default();
+    config.custom_setup = Box::new(pg_establish_connection);
+
+    let mgr = AsyncDieselConnectionManager::<AsyncPgConnection>::new_with_config(
+        &conf.postgresql.dsn,
+        config,
+    );
+    let pool = DeadpoolPool::builder(mgr)
         .max_size(conf.postgresql.max_open_connections as usize)
         .build()?;
     set_async_db_pool(pool);
@@ -214,6 +225,54 @@ pub async fn setup() -> Result<()> {
     }
 
     Ok(())
+}
+
+// Source:
+// https://github.com/weiznich/diesel_async/blob/main/examples/postgres/pooled-with-rustls/src/main.rs
+fn pg_establish_connection(config: &str) -> BoxFuture<ConnectionResult<AsyncPgConnection>> {
+    let fut = async {
+        let root_certs =
+            pg_root_certs().map_err(|e| ConnectionError::BadConnection(e.to_string()))?;
+        let rustls_config = rustls::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_certs)
+            .with_no_client_auth();
+        let tls = tokio_postgres_rustls::MakeRustlsConnect::new(rustls_config);
+        let (client, conn) = tokio_postgres::connect(config, tls)
+            .await
+            .map_err(|e| ConnectionError::BadConnection(e.to_string()))?;
+        tokio::spawn(async move {
+            if let Err(e) = conn.await {
+                error!(error = %e, "PostgreSQL connection error");
+            }
+        });
+        AsyncPgConnection::try_from(client).await
+    };
+    fut.boxed()
+}
+
+fn pg_root_certs() -> Result<rustls::RootCertStore> {
+    let conf = config::get();
+
+    let mut roots = rustls::RootCertStore::empty();
+    let certs = rustls_native_certs::load_native_certs()?;
+    let certs: Vec<_> = certs.into_iter().map(|cert| cert.0).collect();
+    roots.add_parsable_certificates(&certs);
+
+    if !conf.postgresql.ca_cert.is_empty() {
+        let f = File::open(&conf.postgresql.ca_cert).context("Open ca certificate")?;
+        let mut reader = BufReader::new(f);
+        let certs = rustls_pemfile::certs(&mut reader)?;
+        for cert in certs
+            .into_iter()
+            .map(rustls::Certificate)
+            .collect::<Vec<_>>()
+        {
+            roots.add(&cert)?;
+        }
+    }
+
+    Ok(roots)
 }
 
 pub fn get_async_db_pool() -> Result<AsyncPgPool> {

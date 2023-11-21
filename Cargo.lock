@@ -701,6 +701,7 @@ dependencies = [
  "diesel_migrations",
  "dotenv",
  "futures",
+ "futures-util",
  "gcp_auth",
  "geohash",
  "handlebars",
@@ -735,6 +736,9 @@ dependencies = [
  "reqwest",
  "rquickjs",
  "rust-embed",
+ "rustls 0.21.7",
+ "rustls-native-certs",
+ "rustls-pemfile",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -743,6 +747,8 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-executor-trait",
+ "tokio-postgres",
+ "tokio-postgres-rustls",
  "tokio-reactor-trait",
  "tokio-stream",
  "toml",
@@ -4259,6 +4265,20 @@ dependencies = [
  "tokio",
  "tokio-util",
  "whoami",
+]
+
+[[package]]
+name = "tokio-postgres-rustls"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd5831152cb0d3f79ef5523b357319ba154795d64c7078b2daa95a803b54057f"
+dependencies = [
+ "futures",
+ "ring",
+ "rustls 0.21.7",
+ "tokio",
+ "tokio-postgres",
+ "tokio-rustls 0.24.1",
 ]
 
 [[package]]
