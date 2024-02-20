@@ -216,6 +216,8 @@ async fn import_device(
                 "KR920-923" => vec![CommonName::KR920],
                 "IN865-867" => vec![CommonName::IN865],
                 "RU864-870" => vec![CommonName::RU864],
+                "EUFSK" => vec![CommonName::EUFSK],
+                "QL256" => vec![CommonName::QL256],
                 _ => {
                     return Err(anyhow!("Unexpected region: {}", region));
                 }

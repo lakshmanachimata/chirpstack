@@ -32,6 +32,8 @@ impl FromProto<CommonName> for common::Region {
             common::Region::In865 => CommonName::IN865,
             common::Region::Ru864 => CommonName::RU864,
             common::Region::Ism2400 => CommonName::ISM2400,
+            common::Region::Eufsk => CommonName::EUFSK,
+            common::Region::Ql256 => CommonName::QL256,
         }
     }
 }
@@ -53,6 +55,8 @@ impl ToProto<common::Region> for CommonName {
             CommonName::IN865 => common::Region::In865,
             CommonName::RU864 => common::Region::Ru864,
             CommonName::ISM2400 => common::Region::Ism2400,
+            CommonName::EUFSK => common::Region::Eufsk,
+            CommonName::QL256 => common::Region::Ql256,
         }
     }
 }

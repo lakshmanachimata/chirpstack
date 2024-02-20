@@ -23,9 +23,11 @@ pub mod cn470;
 pub mod cn779;
 pub mod eu433;
 pub mod eu868;
+pub mod eufsk;
 pub mod in865;
 pub mod ism2400;
 pub mod kr920;
+pub mod ql256;
 pub mod ru864;
 pub mod us915;
 
@@ -36,6 +38,7 @@ pub mod us915;
 #[cfg_attr(feature = "diesel", diesel(sql_type = diesel::sql_types::Text))]
 pub enum CommonName {
     EU868,
+    EUFSK,
     US915,
     CN779,
     EU433,
@@ -47,6 +50,7 @@ pub enum CommonName {
     AS923_4,
     KR920,
     IN865,
+    QL256,
     RU864,
     ISM2400,
 }
@@ -91,6 +95,7 @@ impl FromStr for CommonName {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(match s {
             "EU868" => CommonName::EU868,
+            "EUFSK" => CommonName::EUFSK,
             "US915" => CommonName::US915,
             "CN779" => CommonName::CN779,
             "EU433" => CommonName::EU433,
@@ -102,6 +107,7 @@ impl FromStr for CommonName {
             "AS923_4" | "AS923-4" => CommonName::AS923_4,
             "KR920" => CommonName::KR920,
             "IN865" => CommonName::IN865,
+            "QL256" => CommonName::QL256,
             "RU864" => CommonName::RU864,
             "ISM2400" => CommonName::ISM2400,
             _ => {
@@ -896,9 +902,11 @@ pub fn get(
         CommonName::CN779 => Box::new(cn779::Configuration::new(repeater_compatible)),
         CommonName::EU433 => Box::new(eu433::Configuration::new(repeater_compatible)),
         CommonName::EU868 => Box::new(eu868::Configuration::new(repeater_compatible)),
+        CommonName::EUFSK => Box::new(eufsk::Configuration::new(repeater_compatible)),
         CommonName::IN865 => Box::new(in865::Configuration::new(repeater_compatible)),
         CommonName::ISM2400 => Box::new(ism2400::Configuration::new(repeater_compatible)),
         CommonName::KR920 => Box::new(kr920::Configuration::new(repeater_compatible)),
+        CommonName::QL256 => Box::new(ql256::Configuration::new(repeater_compatible)),
         CommonName::RU864 => Box::new(ru864::Configuration::new(repeater_compatible)),
         CommonName::US915 => Box::new(us915::Configuration::new(repeater_compatible)),
     }

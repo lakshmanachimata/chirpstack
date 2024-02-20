@@ -41,6 +41,8 @@ impl Into<String> for Region {
             Region::In865 => "IN865",
             Region::Ru864 => "RU864",
             Region::Ism2400 => "ISM2400",
+            Region::Eufsk => "EUFSK",
+            Region::Ql256 => "QL256",
         }
         .to_string()
     }
@@ -52,6 +54,7 @@ impl FromStr for Region {
     fn from_str(s: &str) -> Result<Self, Box<dyn Error>> {
         Ok(match s {
             "EU868" => Region::Eu868,
+            "EUFSK" => Region::Eufsk,
             "US915" => Region::Us915,
             "CN779" => Region::Cn779,
             "EU433" => Region::Eu433,
@@ -63,6 +66,7 @@ impl FromStr for Region {
             "AS923_4" => Region::As9234,
             "KR920" => Region::Kr920,
             "IN865" => Region::In865,
+            "QL256" => Region::Ql256,
             "RU864" => Region::Ru864,
             "ISM2400" => Region::Ism2400,
             _ => {

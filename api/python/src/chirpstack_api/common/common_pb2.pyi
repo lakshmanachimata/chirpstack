@@ -29,6 +29,8 @@ class Region(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     IN865: _ClassVar[Region]
     RU864: _ClassVar[Region]
     ISM2400: _ClassVar[Region]
+    EUFSK: _ClassVar[Region]
+    QL256: _ClassVar[Region]
 
 class MType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = []
@@ -103,6 +105,8 @@ KR920: Region
 IN865: Region
 RU864: Region
 ISM2400: Region
+EUFSK: Region
+QL256: Region
 JOIN_REQUEST: MType
 JOIN_ACCEPT: MType
 UNCONFIRMED_DATA_UP: MType

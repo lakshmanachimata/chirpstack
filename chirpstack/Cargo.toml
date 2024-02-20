@@ -184,6 +184,8 @@ conf-files = [
 	"/etc/chirpstack/region_us915_5.toml",
 	"/etc/chirpstack/region_us915_6.toml",
 	"/etc/chirpstack/region_us915_7.toml",
+    "/etc/chirpstack/region_eufsk.toml",
+    "/etc/chirpstack/region_ql256.toml",
 ]
 suggests = "postgresql, mosquitto, redis"
 maintainer-scripts = "debian/"

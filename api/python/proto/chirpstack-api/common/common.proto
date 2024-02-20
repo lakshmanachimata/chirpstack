@@ -63,6 +63,12 @@ enum Region {
 
   // ISM2400 (LoRaWAN 2.4 GHz)
   ISM2400 = 11;
+
+  // EUFSK (FSK Test region for AOI)
+  EUFSK = 15;
+
+  // QL256 (QuantumLink region)
+  QL256 = 16;
 }
 
 enum MType {
