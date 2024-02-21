@@ -188,7 +188,7 @@ impl<'a> MqttBackend<'a> {
 
             async move {
                 while connect_rx.recv().await.is_some() {
-                    info!(region_id = %region_config_id, event_topic = %event_topic, "Subscribing to gateway event topic");
+                    info!(region_id = %region_config_id, event_topic = %event_topic, "Subscribing to gateway event topic for region");
                     if let Err(e) = client.subscribe(&event_topic, qos).await {
                         error!(region_id = %region_config_id, event_topic = %event_topic, error = %e, "MQTT subscribe error");
                     }
